@@ -158,6 +158,14 @@ tests =
                 \a b ->
                     D.powFloat (D.fromFloat a) b
                         |> expectFDEqual (a ^ b)
+            , fuzz Fuzz.float "dec abs == float abs" <|
+                \a ->
+                    D.abs (D.fromFloat a)
+                        |> expectFDEqual (abs a)
+            , fuzz Fuzz.float "dec sqrt == float sqrt" <|
+                \a ->
+                    D.sqrt (D.fromFloat a)
+                        |> expectFDEqual (sqrt a)
             ]
         , describe "comparison"
             [ fuzz2 Fuzz.float Fuzz.float "dec compare == float compare" <|

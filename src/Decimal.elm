@@ -1,7 +1,8 @@
 module Decimal exposing
     ( Decimal(..), fromFloat, fromSigExp, fromString, toString
-    , add, sub, mul, div, neg, powFloat, logBase, log10
+    , add, sub, mul, div, powFloat
     , compare, gt, gte, lt, lte, min, max
+    , neg, abs, clamp, sqrt, logBase, log10
     , flipSub, flipDiv
     , flipDivFloat, flipPowFloat, mulFloat
     )
@@ -16,7 +17,7 @@ module Decimal exposing
 
 # Math
 
-@docs add, sub, mul, div, neg, powFloat, logBase, log10
+@docs add, sub, mul, div, powFloat
 
 
 # Comparison
@@ -24,6 +25,11 @@ module Decimal exposing
 No special equality functions - use Elm's builtin `==` and `/=` .
 
 @docs compare, gt, gte, lt, lte, min, max
+
+
+# Fancier math
+
+@docs neg, abs, clamp, sqrt, logBase, log10
 
 
 # Pipelined math
@@ -65,7 +71,7 @@ fromSigExp sig exp =
             -- normalize significand and exponent
             dExp : Int
             dExp =
-                sig |> abs |> Basics.logBase baseFloat |> floor
+                sig |> Basics.abs |> Basics.logBase baseFloat |> floor
         in
         Decimal
             { sig = sigTimesExp sig dExp
@@ -114,7 +120,7 @@ infiniteInt =
 
 toString : Decimal -> String
 toString (Decimal { sig, exp }) =
-    if abs exp < 21 || exp == infiniteInt || isInfinite sig || isNaN sig then
+    if Basics.abs exp < 21 || exp == infiniteInt || isInfinite sig || isNaN sig then
         sig * toFloat (base ^ exp) |> String.fromFloat
 
     else
@@ -312,3 +318,18 @@ powFloat (Decimal { sig, exp }) toExp =
 flipPowFloat : Float -> Decimal -> Decimal
 flipPowFloat exp base_ =
     powFloat base_ exp
+
+
+abs : Decimal -> Decimal
+abs (Decimal { sig, exp }) =
+    Decimal { sig = Basics.abs sig, exp = exp }
+
+
+sqrt : Decimal -> Decimal
+sqrt =
+    flipPowFloat 0.5
+
+
+clamp : Decimal -> Decimal -> Decimal -> Decimal
+clamp bot top =
+    min top >> max bot
