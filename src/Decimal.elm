@@ -2,6 +2,7 @@ module Decimal exposing
     ( Decimal(..), fromFloat, fromSigExp, fromString, toString
     , add, sub, mul, div, powFloat
     , compare, gt, gte, lt, lte, min, max
+    , isNaN, isInfinite, isFinite
     , neg, abs, clamp, sqrt, logBase, log10
     , flipSub, flipDiv
     , flipDivFloat, flipPowFloat, mulFloat
@@ -25,6 +26,10 @@ module Decimal exposing
 No special equality functions - use Elm's builtin `==` and `/=` .
 
 @docs compare, gt, gte, lt, lte, min, max
+
+#Validation
+
+@docs isNaN, isInfinite, isFinite
 
 
 # Fancier math
@@ -120,7 +125,7 @@ infiniteInt =
 
 toString : Decimal -> String
 toString (Decimal { sig, exp }) =
-    if Basics.abs exp < 21 || exp == infiniteInt || isInfinite sig || isNaN sig then
+    if Basics.abs exp < 21 || exp == infiniteInt || Basics.isInfinite sig || Basics.isNaN sig then
         sig * toFloat (base ^ exp) |> String.fromFloat
 
     else
@@ -142,7 +147,7 @@ sigOfExp (Decimal { sig, exp }) targetExp =
 
 sigTimesExp : Float -> Int -> Float
 sigTimesExp sig dExp =
-    if dExp == 0 || isInfinite sig then
+    if dExp == 0 || Basics.isInfinite sig then
         -- dExp == 0: it looks like the result should be identical, but js does
         -- strange things with float precision, so let's be sure.
         --
@@ -333,3 +338,35 @@ sqrt =
 clamp : Decimal -> Decimal -> Decimal -> Decimal
 clamp bot top =
     min top >> max bot
+
+
+{-| Implies `not isInfinite` and `not isFinite`
+-}
+isNaN : Decimal -> Bool
+isNaN (Decimal { sig, exp }) =
+    -- the (isNaN (toFloat exp)) is necessary, surprisingly.
+    -- 0 // 0 --> 0
+    -- ...but:
+    -- (0 / 0 |> floor) --> NaN : Int
+    Basics.isNaN sig || Basics.isNaN (toFloat exp)
+
+
+{-| Implies `not isNaN` and `not isFinite`
+-}
+isInfinite : Decimal -> Bool
+isInfinite ((Decimal { sig, exp }) as d) =
+    -- the (isInfinite (toFloat exp)) is necessary, surprisingly.
+    -- 1 // 0 --> 0
+    -- ...but:
+    -- (1 / 0 |> floor) --> Infinite : Int
+    not (isNaN d) && (Basics.isInfinite sig || Basics.isInfinite (toFloat exp))
+
+
+{-| Implies `not isNaN` and `not isInfinite`
+
+This is usually what we want
+
+-}
+isFinite : Decimal -> Bool
+isFinite =
+    isInfinite >> not

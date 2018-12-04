@@ -197,4 +197,18 @@ tests =
                     D.max (D.fromFloat a) (D.fromFloat b)
                         |> expectFDEqual (max a b)
             ]
+        , describe "validation"
+            [ fuzz Fuzz.float "dec isNaN == float isNaN" <|
+                \a ->
+                    D.isNaN (D.fromFloat a)
+                        |> Expect.equal (isNaN a)
+            , fuzz Fuzz.float "dec isInfinite == float isInfinite" <|
+                \a ->
+                    D.isInfinite (D.fromFloat a)
+                        |> Expect.equal (isInfinite a)
+            , fuzz Fuzz.float "dec isFinite == float isFinite" <|
+                \a ->
+                    D.isFinite (D.fromFloat a)
+                        |> Expect.equal (not (isNaN a) && not (isInfinite a))
+            ]
         ]
