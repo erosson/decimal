@@ -1,5 +1,5 @@
 module Decimal exposing
-    ( Decimal(..), fromFloat, fromSigExp, fromString, toString
+    ( Decimal, fromFloat, fromSigExp, fromString, toString, significand, exponent
     , add, sub, mul, div, powFloat
     , compare, gt, gte, lt, lte, min, max
     , isNaN, isInfinite, isFinite
@@ -13,7 +13,7 @@ module Decimal exposing
 
 # Construction and strings
 
-@docs Decimal, fromFloat, fromSigExp, fromString, toString
+@docs Decimal, fromFloat, fromSigExp, fromString, toString, significand, exponent
 
 
 # Math
