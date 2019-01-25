@@ -1,4 +1,4 @@
-module TestDecimal exposing (tests)
+module DecimalTest exposing (tests)
 
 import Decimal as D exposing (Decimal)
 import Expect
