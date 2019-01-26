@@ -2,10 +2,12 @@ module Decimal exposing
     ( Decimal, fromFloat, fromSigExp, fromString, toString, significand, exponent
     , add, sub, mul, div, powFloat
     , compare, gt, gte, lt, lte, min, max
+    , sum, product, minimum, maximum
     , isNaN, isInfinite, isFinite
     , neg, abs, clamp, sqrt, logBase, log10
     , flipSub, flipDiv
     , flipDivFloat, flipPowFloat, mulFloat
+    , zero, one, negativeOne
     )
 
 {-| Limited-precision large-range reasonably-fast floating-point numbers.
@@ -27,6 +29,11 @@ No special equality functions - use Elm's builtin `==` and `/=` .
 
 @docs compare, gt, gte, lt, lte, min, max
 
+
+# List operations
+
+@docs sum, product, minimum, maximum
+
 #Validation
 
 @docs isNaN, isInfinite, isFinite
@@ -46,7 +53,14 @@ No special equality functions - use Elm's builtin `==` and `/=` .
 
 @docs flipDivFloat, flipPowFloat, mulFloat
 
+
+# Common values
+
+@docs zero, one, negativeOne
+
 -}
+
+-- TODO: rounding. floor, ceil, round, ...
 
 
 type Decimal
@@ -212,6 +226,26 @@ max a b =
         b
 
 
+minimum : List Decimal -> Maybe Decimal
+minimum ds =
+    case ds of
+        [] ->
+            Nothing
+
+        head :: tail ->
+            Just <| List.foldl min head tail
+
+
+maximum : List Decimal -> Maybe Decimal
+maximum ds =
+    case ds of
+        [] ->
+            Nothing
+
+        head :: tail ->
+            Just <| List.foldl max head tail
+
+
 add : Decimal -> Decimal -> Decimal
 add ((Decimal a) as da) ((Decimal b) as db) =
     let
@@ -219,6 +253,11 @@ add ((Decimal a) as da) ((Decimal b) as db) =
             Basics.max a.exp b.exp
     in
     fromSigExp (sigOfExp da exp + sigOfExp db exp) exp
+
+
+sum : List Decimal -> Decimal
+sum =
+    List.foldl add zero
 
 
 neg : Decimal -> Decimal
@@ -244,6 +283,11 @@ flipSub a b =
 mul : Decimal -> Decimal -> Decimal
 mul (Decimal a) (Decimal b) =
     fromSigExp (a.sig * b.sig) (a.exp + b.exp)
+
+
+product : List Decimal -> Decimal
+product =
+    List.foldl mul one
 
 
 mulFloat : Float -> Decimal -> Decimal
@@ -370,3 +414,18 @@ This is usually what we want
 isFinite : Decimal -> Bool
 isFinite =
     isInfinite >> not
+
+
+zero : Decimal
+zero =
+    fromFloat 0
+
+
+one : Decimal
+one =
+    fromFloat 1
+
+
+negativeOne : Decimal
+negativeOne =
+    fromFloat -1
