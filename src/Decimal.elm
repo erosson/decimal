@@ -1,21 +1,22 @@
 module Decimal exposing
-    ( Decimal, fromFloat, fromSigExp, fromString, toString, significand, exponent
+    ( Decimal, fromFloat, fromInt, fromSigExp, fromString, toString, toFloat, toFiniteFloat, significand, exponent
     , add, sub, mul, div, powFloat
     , compare, gt, gte, lt, lte, min, max
     , sum, product, minimum, maximum
     , isNaN, isInfinite, isFinite
     , neg, abs, clamp, sqrt, logBase, log10
     , flipSub, flipDiv
-    , flipDivFloat, flipPowFloat, mulFloat
-    , zero, one, negativeOne
+    , round, ceiling, floor, truncate
+    , flipDivFloat, flipPowFloat, mulFloat, mulInt
+    , zero, one, negativeOne, infinity, negativeInfinity
     )
 
-{-| Limited-precision large-range reasonably-fast floating-point numbers.
+{-| A floating-point value with a 32-bit exponent.
 
 
 # Construction and strings
 
-@docs Decimal, fromFloat, fromSigExp, fromString, toString, significand, exponent
+@docs Decimal, fromFloat, fromInt, fromSigExp, fromString, toString, toFloat, toFiniteFloat, significand, exponent
 
 
 # Math
@@ -49,18 +50,21 @@ No special equality functions - use Elm's builtin `==` and `/=` .
 @docs flipSub, flipDiv
 
 
+# Rounding
+
+@docs round, ceiling, floor, truncate
+
+
 # Interacting with floats
 
-@docs flipDivFloat, flipPowFloat, mulFloat
+@docs flipDivFloat, flipPowFloat, mulFloat, mulInt
 
 
 # Common values
 
-@docs zero, one, negativeOne
+@docs zero, one, negativeOne, infinity, negativeInfinity
 
 -}
-
--- TODO: rounding. floor, ceil, round, ...
 
 
 type Decimal
@@ -90,7 +94,7 @@ fromSigExp sig exp =
             -- normalize significand and exponent
             dExp : Int
             dExp =
-                sig |> Basics.abs |> Basics.logBase baseFloat |> floor
+                sig |> Basics.abs |> Basics.logBase baseFloat |> Basics.floor
         in
         Decimal
             { sig = sigTimesExp sig dExp
@@ -113,13 +117,38 @@ fromFloat sig =
     fromSigExp sig 0
 
 
+fromInt : Int -> Decimal
+fromInt =
+    Basics.toFloat >> fromFloat
+
+
+toFloat : Decimal -> Float
+toFloat (Decimal { sig, exp }) =
+    sig * baseFloat ^ Basics.toFloat exp
+
+
+{-| Convert to float, checking for Infinity/NaN.
+-}
+toFiniteFloat : Decimal -> Maybe Float
+toFiniteFloat d =
+    let
+        f =
+            toFloat d
+    in
+    if Basics.isInfinite f || Basics.isNaN f then
+        Nothing
+
+    else
+        Just f
+
+
 base : Int
 base =
     10
 
 
 baseFloat =
-    base |> toFloat
+    base |> Basics.toFloat
 
 
 significand : Decimal -> Float
@@ -134,13 +163,13 @@ exponent (Decimal { exp }) =
 
 infiniteInt : Int
 infiniteInt =
-    1 / 0 |> floor
+    1 / 0 |> Basics.floor
 
 
 toString : Decimal -> String
-toString (Decimal { sig, exp }) =
+toString ((Decimal { sig, exp }) as d) =
     if Basics.abs exp < 21 || exp == infiniteInt || Basics.isInfinite sig || Basics.isNaN sig then
-        sig * toFloat (base ^ exp) |> String.fromFloat
+        d |> toFloat |> String.fromFloat
 
     else
         String.fromFloat sig ++ "e" ++ String.fromInt exp
@@ -169,7 +198,7 @@ sigTimesExp sig dExp =
         sig
 
     else
-        sig / toFloat (base ^ dExp)
+        sig / Basics.toFloat (base ^ dExp)
 
 
 compare : Decimal -> Decimal -> Order
@@ -295,6 +324,11 @@ mulFloat f (Decimal { sig, exp }) =
     fromSigExp (sig * f) exp
 
 
+mulInt : Int -> Decimal -> Decimal
+mulInt i =
+    Basics.toFloat i |> mulFloat
+
+
 div : Decimal -> Decimal -> Decimal
 div (Decimal a) (Decimal b) =
     fromSigExp (a.sig / b.sig) (a.exp - b.exp)
@@ -317,7 +351,7 @@ flipDivFloat f (Decimal { sig, exp }) =
 
 log10 : Decimal -> Float
 log10 (Decimal { sig, exp }) =
-    Basics.logBase baseFloat sig + toFloat exp
+    Basics.logBase baseFloat sig + Basics.toFloat exp
 
 
 ln10 =
@@ -336,9 +370,9 @@ exp10 val =
             Basics.logBase baseFloat val
 
         exp =
-            log |> floor
+            log |> Basics.floor
     in
-    fromSigExp (10 ^ (log - toFloat exp)) exp
+    fromSigExp (10 ^ (log - Basics.toFloat exp)) exp
 
 
 powFloat : Decimal -> Float -> Decimal
@@ -346,13 +380,13 @@ powFloat (Decimal { sig, exp }) toExp =
     -- cribbed from https://github.com/Patashu/break_infinity.js/blob/0ba078baca0ad1761103907a34c1268f0e5f6f53/break_infinity.js#L1186
     let
         expMul =
-            toFloat exp * toExp
+            Basics.toFloat exp * toExp
 
         newExp =
-            truncate expMul
+            Basics.truncate expMul
 
         residue =
-            expMul - toFloat newExp
+            expMul - Basics.toFloat newExp
 
         newSig =
             if residue == 0 then
@@ -384,6 +418,64 @@ clamp bot top =
     min top >> max bot
 
 
+{-| Trying to round large numbers achieves nothing; return something if it's small enough to round.
+
+I haven't defined a "round to n places" operation.
+
+-}
+roundableFloat : Decimal -> Result Decimal Float
+roundableFloat ((Decimal { sig, exp }) as d) =
+    if exp > 8 then
+        Err d
+
+    else
+        Ok <| toFloat d
+
+
+{-| Round down if the Decimal is small enough that rounding the ones digit is meaningful.
+
+Decimals are not precise enough to meaningfully represent the result of a rounded number,
+but not all decimals are small enough to convert to an integer. Large decimals return `Nothing`.
+
+-}
+floor : Decimal -> Result Decimal Int
+floor =
+    roundableFloat >> Result.map Basics.floor
+
+
+{-| Round towards zero if the Decimal is small enough that rounding the ones digit is meaningful.
+
+Decimals are not precise enough to meaningfully represent the result of a rounded number,
+but not all decimals are small enough to convert to an integer. Large decimals return `Nothing`.
+
+-}
+truncate : Decimal -> Result Decimal Int
+truncate =
+    roundableFloat >> Result.map Basics.truncate
+
+
+{-| Round up if the Decimal is small enough that rounding the ones digit is meaningful.
+
+Decimals are not precise enough to meaningfully represent the result of a rounded number,
+but not all decimals are small enough to convert to an integer. Large decimals return `Nothing`.
+
+-}
+ceiling : Decimal -> Result Decimal Int
+ceiling =
+    roundableFloat >> Result.map Basics.ceiling
+
+
+{-| Round towards the closest integer if the Decimal is small enough that rounding the ones digit is meaningful.
+
+Decimals are not precise enough to meaningfully represent the result of a rounded number,
+but not all decimals are small enough to convert to an integer. Large decimals return `Nothing`.
+
+-}
+round : Decimal -> Result Decimal Int
+round =
+    roundableFloat >> Result.map Basics.round
+
+
 {-| Implies `not isInfinite` and `not isFinite`
 -}
 isNaN : Decimal -> Bool
@@ -392,7 +484,7 @@ isNaN (Decimal { sig, exp }) =
     -- 0 // 0 --> 0
     -- ...but:
     -- (0 / 0 |> floor) --> NaN : Int
-    Basics.isNaN sig || Basics.isNaN (toFloat exp)
+    Basics.isNaN sig || Basics.isNaN (Basics.toFloat exp)
 
 
 {-| Implies `not isNaN` and `not isFinite`
@@ -403,7 +495,7 @@ isInfinite ((Decimal { sig, exp }) as d) =
     -- 1 // 0 --> 0
     -- ...but:
     -- (1 / 0 |> floor) --> Infinite : Int
-    not (isNaN d) && (Basics.isInfinite sig || Basics.isInfinite (toFloat exp))
+    not (isNaN d) && (Basics.isInfinite sig || Basics.isInfinite (Basics.toFloat exp))
 
 
 {-| Implies `not isNaN` and `not isInfinite`
@@ -429,3 +521,13 @@ one =
 negativeOne : Decimal
 negativeOne =
     fromFloat -1
+
+
+infinity : Decimal
+infinity =
+    fromFloat (1 / 0)
+
+
+negativeInfinity : Decimal
+negativeInfinity =
+    fromFloat (-1 / 0)
